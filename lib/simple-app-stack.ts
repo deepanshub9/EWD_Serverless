@@ -6,6 +6,7 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as custom from "aws-cdk-lib/custom-resources";
 import { generateBatch } from "../shared/util";
 import { movies } from "../seed/movies";
+import * as iam from "aws-cdk-lib/aws-iam";
 
 export class SimpleAppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -51,6 +52,42 @@ export class SimpleAppStack extends cdk.Stack {
       policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
         resources: [moviesTable.tableArn],
       }),
+    });
+
+    const getMovieByIdFn = new lambdanode.NodejsFunction(
+      this,
+      "GetMovieByIdFn",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_22_X,
+        entry: `${__dirname}/../lambdas/getMovieById.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: moviesTable.tableName,
+          REGION: "us-east-1",
+        },
+      }
+    );
+
+    const getMovieByIdURL = getMovieByIdFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ["*"],
+      },
+    });
+
+    const dynamoPolicy = new iam.PolicyStatement({
+      actions: ["dynamodb:GetItem"],
+      resources: [moviesTable.tableArn],
+    });
+
+    getMovieByIdFn.addToRolePolicy(dynamoPolicy);
+
+    moviesTable.grantReadData(getMovieByIdFn);
+
+    new cdk.CfnOutput(this, "Get Movie Function Url", {
+      value: getMovieByIdURL.url,
     });
   }
 }
