@@ -77,17 +77,46 @@ export class SimpleAppStack extends cdk.Stack {
       },
     });
 
-    const dynamoPolicy = new iam.PolicyStatement({
-      actions: ["dynamodb:GetItem"],
-      resources: [moviesTable.tableArn],
-    });
+    // const dynamoPolicy = new iam.PolicyStatement({
+    //   actions: ["dynamodb:GetItem"],
+    //   resources: [moviesTable.tableArn],
+    // });
 
-    getMovieByIdFn.addToRolePolicy(dynamoPolicy);
+    // getMovieByIdFn.addToRolePolicy(dynamoPolicy);
 
     moviesTable.grantReadData(getMovieByIdFn);
 
     new cdk.CfnOutput(this, "Get Movie Function Url", {
       value: getMovieByIdURL.url,
+    });
+
+    const getAllMoviesFn = new lambdanode.NodejsFunction(
+      this,
+      "GetAllMoviesFn",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_22_X,
+        entry: `${__dirname}/../lambdas/getAllMovies.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          TABLE_NAME: moviesTable.tableName,
+          REGION: "us-east-1",
+        },
+      }
+    );
+
+    const getAllMoviesURL = getAllMoviesFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ["*"],
+      },
+    });
+
+    moviesTable.grantReadData(getAllMoviesFn);
+
+    new cdk.CfnOutput(this, "Get All Movies Function Url", {
+      value: getAllMoviesURL.url,
     });
   }
 }
