@@ -5,7 +5,7 @@ import { Construct } from "constructs";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as custom from "aws-cdk-lib/custom-resources";
 import { generateBatch } from "../shared/util";
-import { movies } from "../seed/movies";
+import { movies, movieCasts } from "../seed/movies";
 import * as iam from "aws-cdk-lib/aws-iam";
 
 export class SimpleAppStack extends cdk.Stack {
@@ -38,19 +38,56 @@ export class SimpleAppStack extends cdk.Stack {
       tableName: "Movies",
     });
 
-    new custom.AwsCustomResource(this, "MoviesDDBInitData", {
+    const movieCastsTable = new dynamodb.Table(this, "MovieCastTable", {
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: "movieId", type: dynamodb.AttributeType.NUMBER },
+      sortKey: { name: "actorName", type: dynamodb.AttributeType.STRING },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      tableName: "MovieCast",
+    });
+
+    movieCastsTable.addLocalSecondaryIndex({
+      indexName: "roleIx",
+      sortKey: { name: "roleName", type: dynamodb.AttributeType.STRING },
+    });
+
+    const getMovieCastMembersFn = new lambdanode.NodejsFunction(
+      this,
+      "GetCastMemberFn",
+      {
+        architecture: lambda.Architecture.ARM_64,
+        runtime: lambda.Runtime.NODEJS_22_X,
+        entry: `${__dirname}/../lambdas/getMovieCastMembers.ts`,
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 128,
+        environment: {
+          CAST_TABLE_NAME: movieCastsTable.tableName,
+          REGION: "us-east-1",
+        },
+      }
+    );
+
+    const getMovieCastMembersURL = getMovieCastMembersFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: { allowedOrigins: ["*"] },
+    });
+
+    movieCastsTable.grantReadData(getMovieCastMembersFn);
+
+    new custom.AwsCustomResource(this, "moviesddbInitData", {
       onCreate: {
         service: "DynamoDB",
         action: "batchWriteItem",
         parameters: {
           RequestItems: {
             [moviesTable.tableName]: generateBatch(movies),
+            [movieCastsTable.tableName]: generateBatch(movieCasts),
           },
         },
-        physicalResourceId: custom.PhysicalResourceId.of("MoviesDDBInitData"),
+        physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"),
       },
       policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
-        resources: [moviesTable.tableArn],
+        resources: [moviesTable.tableArn, movieCastsTable.tableArn],
       }),
     });
 
@@ -70,25 +107,6 @@ export class SimpleAppStack extends cdk.Stack {
       }
     );
 
-    const movieCastsTable = new dynamodb.Table(this, "MovieCastsTable", {
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      partitionKey: { name: "id", type: dynamodb.AttributeType.NUMBER },
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      tableName: "MovieCasts",
-    });
-    
-    const getMovieCastMembersFn = new lambdanode.NodejsFunction(this, "GetCastMemberFn", {
-      architecture: lambda.Architecture.ARM_64,
-      runtime: lambda.Runtime.NODEJS_22_X,
-      entry: `${__dirname}/../lambdas/getMovieCastMembers.ts`,
-      timeout: cdk.Duration.seconds(10),
-      memorySize: 128,
-      environment: {
-        CAST_TABLE_NAME: movieCastsTable.tableName,
-        REGION: "us-east-1", 
-      },
-    });
-    
     const getMovieByIdURL = getMovieByIdFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
       cors: {
