@@ -70,19 +70,31 @@ export class SimpleAppStack extends cdk.Stack {
       }
     );
 
+    const movieCastsTable = new dynamodb.Table(this, "MovieCastsTable", {
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: "id", type: dynamodb.AttributeType.NUMBER },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      tableName: "MovieCasts",
+    });
+    
+    const getMovieCastMembersFn = new lambdanode.NodejsFunction(this, "GetCastMemberFn", {
+      architecture: lambda.Architecture.ARM_64,
+      runtime: lambda.Runtime.NODEJS_22_X,
+      entry: `${__dirname}/../lambdas/getMovieCastMembers.ts`,
+      timeout: cdk.Duration.seconds(10),
+      memorySize: 128,
+      environment: {
+        CAST_TABLE_NAME: movieCastsTable.tableName,
+        REGION: "us-east-1", 
+      },
+    });
+    
     const getMovieByIdURL = getMovieByIdFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
       cors: {
         allowedOrigins: ["*"],
       },
     });
-
-    // const dynamoPolicy = new iam.PolicyStatement({
-    //   actions: ["dynamodb:GetItem"],
-    //   resources: [moviesTable.tableArn],
-    // });
-
-    // getMovieByIdFn.addToRolePolicy(dynamoPolicy);
 
     moviesTable.grantReadData(getMovieByIdFn);
 
@@ -118,5 +130,8 @@ export class SimpleAppStack extends cdk.Stack {
     new cdk.CfnOutput(this, "Get All Movies Function Url", {
       value: getAllMoviesURL.url,
     });
+
+    // Grant read permissions to the getMovieCastMembersFn for the movieCastsTable
+    movieCastsTable.grantReadData(getMovieCastMembersFn);
   }
 }

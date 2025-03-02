@@ -1,4 +1,4 @@
-import { Movie } from "../shared/types";
+import { Movie, MovieCast, MovieDetails } from "../shared/types";
 
 export const movies: Movie[] = [
   {
@@ -342,3 +342,44 @@ export const movies: Movie[] = [
     vote_count: 325,
   },
 ];
+
+export const movieCasts: MovieCast[] = [
+  {
+    movieId: 1234,
+    actorName: "Joe Bloggs",
+    roleName: "Male Character 1",
+    roleDescription: "description of character 1",
+  },
+  {
+    movieId: 1234,
+    actorName: "Alice Broggs",
+    roleName: "Female Character 1",
+    roleDescription: "description of character 2",
+  },
+  {
+    movieId: 1234,
+    actorName: "Joe Cloggs",
+    roleName: "Male Character 2",
+    roleDescription: "description of character 3",
+  },
+  {
+    movieId: 2345,
+    actorName: "Joe Bloggs",
+    roleName: "Male Character 1",
+    roleDescription: "description of character 3",
+  },
+];
+
+
+export const movieDetails: { [key: number]: MovieDetails } = {
+  1234: {
+    title: "HeroPanti Movie",
+    genreIds: [1, 2, 3],
+    overview: "This is an example movie overview.",
+  },
+  2345: {
+    title: "Jumanji Movie",
+    genreIds: [4, 5, 6],
+    overview: "This is another example movie overview.",
+  },
+};
