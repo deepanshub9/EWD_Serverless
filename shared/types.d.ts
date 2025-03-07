@@ -1,4 +1,4 @@
-// export type Language = 'English' | 'Frenc
+// export type Language = 'English' | 'French
 
 export type Movie =   {
   id: number,
@@ -16,5 +16,19 @@ export type Movie =   {
   vote_average: number,
   vote_count: number
 }
+
+
+export type MovieCast = {
+  movieId: number;
+  actorName: string;
+  roleName: string;
+  roleDescription: string;
+};
+
+export type MovieCastMemberQueryParams = {
+  movieId: string;
+  actorName?: string;
+  roleName?: string;
+};
 
  
